@@ -1,4 +1,4 @@
-module github.com/iooojik-dev/go-logger
+module github.com/iooojik/go-logger
 
 go 1.18
 
