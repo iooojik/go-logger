@@ -5,7 +5,7 @@
 ```go
 package main
 
-import "github.com/iooojik-dev/go-logger"
+import "github.com/iooojik/go-logger"
 
 func main() {
 	logger.WriteLogsToFile(true, "./log.txt")
