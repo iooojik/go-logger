@@ -1,11 +1,15 @@
 package logger
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"runtime"
 )
 
 var (
@@ -15,6 +19,11 @@ var (
 	debugLogger    = log.New(os.Stdout, "\u001b[33mDEBUG: \u001b[0m", log.LstdFlags)
 	defaultDepth   = 2
 	debugMode      = true
+)
+
+const (
+	HeaderContentType          = "Content-Type"
+	HeaderContentTypeValueJson = "application/json"
 )
 
 type CustomError struct {
@@ -90,5 +99,57 @@ func ChangeDebugMode(mode bool) {
 func LogDebug(msg ...any) {
 	if debugMode {
 		debugLogger.Println(msg...)
+	}
+}
+
+// safeHandler panic handler
+func safeHandler(_ http.Handler, serveHTTP func(w http.ResponseWriter, r *http.Request)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		log.Println(req.URL.String())
+		b, err := io.ReadAll(req.Body)
+		// catching errors when reading the body
+		if err == nil {
+			req.Body = io.NopCloser(bytes.NewBuffer(b))
+		} else {
+			handleInternalError(err, b, req, w)
+			return
+		}
+		// catching errors during request processing
+		defer func() {
+			if e := recover(); e != nil {
+				handleInternalError(e, b, req, w)
+			}
+		}()
+		serveHTTP(w, req)
+	})
+}
+
+func castError(err any) error {
+	var ie error
+	switch er := err.(type) {
+	case string:
+		ie = errors.New(er)
+	case *runtime.Error:
+	case error:
+		ie = er
+	}
+	return errors.Wrap(ie, "capturing panic error")
+}
+
+func handleInternalError(err any, body []byte, r *http.Request, w http.ResponseWriter) {
+	if e := castError(err); e != nil {
+		LogError(errors.Wrap(e, r.URL.String()))
+	} else {
+		LogError(errors.Wrap(errors.New("trying to log panic error, but err object is nil"), r.URL.String()))
+	}
+	if body != nil {
+		if len(body) > 0 {
+			LogError(errors.New(string(body)))
+		}
+	}
+	w.Header().Add(HeaderContentType, HeaderContentTypeValueJson)
+	w.WriteHeader(http.StatusInternalServerError)
+	if ee := json.NewEncoder(w).Encode(err); ee != nil {
+		log.Println(ee)
 	}
 }
