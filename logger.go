@@ -102,8 +102,8 @@ func LogDebug(msg ...any) {
 	}
 }
 
-// safeHandler panic handler
-func safeHandler(_ http.Handler, serveHTTP func(w http.ResponseWriter, r *http.Request)) http.Handler {
+// SafeHandler panic handler
+func SafeHandler(_ http.Handler, serveHTTP func(w http.ResponseWriter, r *http.Request)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		log.Println(req.URL.String())
 		b, err := io.ReadAll(req.Body)
