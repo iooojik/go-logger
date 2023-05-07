@@ -2,10 +2,10 @@ package logger
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/pkg/errors"
 	"log"
 	"os"
-	"runtime"
 )
 
 var (
@@ -13,6 +13,8 @@ var (
 	infoLogger     = log.New(os.Stdout, "INFO: ", log.LstdFlags)
 	positiveLogger = log.New(os.Stdout, "\u001b[32mINFO: \u001b[0m", log.LstdFlags)
 	debugLogger    = log.New(os.Stdout, "\u001b[33mDEBUG: \u001b[0m", log.LstdFlags)
+	defaultDepth   = 2
+	debugMode      = true
 )
 
 type CustomError struct {
@@ -24,17 +26,16 @@ type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
 
-func WriteLogsToFile(write bool, logPath string) {
-	if write {
-		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		errorLogger.SetOutput(logFile)
-		infoLogger.SetOutput(logFile)
-		positiveLogger.SetOutput(logFile)
-		debugLogger.SetOutput(logFile)
+// WriteLogsToFile allow to write logs to `logPath`
+func WriteLogsToFile(logPath string) {
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
+	if err != nil {
+		log.Fatalln(err)
 	}
+	errorLogger.SetOutput(logFile)
+	infoLogger.SetOutput(logFile)
+	positiveLogger.SetOutput(logFile)
+	debugLogger.SetOutput(logFile)
 }
 
 func (b *CustomError) Error() string {
@@ -45,45 +46,49 @@ func (b *CustomError) Error() string {
 	return string(j)
 }
 
-func makeStackTrace(trace errors.StackTrace) string {
-	resultLog := "\n"
-	for _, frame := range trace {
-		text, _ := frame.MarshalText()
-		resultLog += string(text) + "\n"
+func makeStackTrace(depth int, err error) string {
+	v, ok := err.(stackTracer)
+	if ok {
+		trace := v.StackTrace()
+		resultLog := "\n"
+		for _, frame := range trace[depth:] {
+			text, _ := frame.MarshalText()
+			resultLog += string(text) + "\n"
+		}
+		return resultLog
+	} else if err != nil {
+		return err.Error()
+	} else {
+		return ""
 	}
-	return resultLog
 }
 
-func MakeError(msg *string, err error) *CustomError {
-	return &CustomError{
-		msg: err.Error(),
-		err: err,
+func LogError(err error) {
+	if err != nil {
+		logError(defaultDepth, err.Error(), makeStackTrace(defaultDepth, err))
+	} else {
+		logError(defaultDepth, "given error message doesnt implement error interface")
 	}
 }
 
-func LogError(err any) {
-	var internalError error
-	switch er := err.(type) {
-	case string:
-		internalError = errors.New(er)
-	case *CustomError:
-		internalError = er.err
-	case *runtime.Error:
-	case error:
-		internalError = er
+func logError(depth int, v ...any) {
+	_ = errorLogger.Output(depth+1, fmt.Sprintln(v...))
+}
+
+func LogInfo(msg ...any) {
+	infoLogger.Println(msg...)
+}
+
+func LogPositive(msg ...any) {
+	positiveLogger.Println(msg...)
+}
+
+func ChangeDebugMode(mode bool) {
+	debugMode = mode
+}
+
+func LogDebug(msg ...any) {
+	if debugMode {
+		debugLogger.Println(msg...)
 	}
-	errorLogger.Println(internalError.Error())
-	errorLogger.Println(makeStackTrace(errors.WithStack(internalError).(stackTracer).StackTrace()))
-}
-
-func LogInfo(msg any) {
-	infoLogger.Println(msg)
-}
-
-func LogPositive(msg any) {
-	positiveLogger.Println(msg)
-}
-
-func LogDebug(msg any) {
-	debugLogger.Println(msg)
 }

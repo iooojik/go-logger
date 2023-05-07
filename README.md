@@ -12,7 +12,6 @@ func main() {
 	logger.LogInfo("hello world!")
 	logger.LogDebug("hello world!")
 	logger.LogError("hello world!")
-	logger.MakeError(nil, errors.New("smth went wrong"))
 }
 ```
 
@@ -21,7 +20,7 @@ func main() {
 #### Write logs to a file
 
 ```go
-logger.WriteLogsToFile(write bool, logPath string)
+logger.WriteLogsToFile(logPath string)
 ```
 
 #### Log without highlighting
@@ -46,10 +45,4 @@ logger.LogDebug(msg any)
 
 ```go
 logger.LogError(msg any)
-```
-
-#### Make new instance of custom error
-
-```go
-logger.MakeError(msg *string, err error) *CustomError
 ```
